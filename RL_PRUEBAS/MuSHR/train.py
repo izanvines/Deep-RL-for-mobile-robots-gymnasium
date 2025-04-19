@@ -1,5 +1,5 @@
 import os
-import gym, gymnasium
+import gymnasium
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import VecNormalize
@@ -12,9 +12,9 @@ np.random.seed(SEED)
 torch.manual_seed(SEED)
 
 # === CONFIG ===
-models_dir = "/media/izan/usb-rl/models_AMR_180425_1/PPO"
-logdir = "/media/izan/usb-rl/logs_AMR_180425"
-normalize_path = "/media/izan/usb-rl/models_AMR_180425_1/vec_normalize.pkl"
+models_dir = "/media/izan/usb-rl/models_AMR_190425_0/PPO"
+logdir = "/media/izan/usb-rl/logs_AMR_190425"
+normalize_path = "/media/izan/usb-rl/models_AMR_190425_0/vec_normalize.pkl"
 timesteps = 5000
 n_iterations = 2000
 
@@ -48,7 +48,7 @@ model = PPO("MlpPolicy", vec_env, verbose=1, tensorboard_log=logdir)
 
 # === ENTRENAMIENTO ITERATIVO ===
 for i in range(1, n_iterations + 1):
-    model.learn(total_timesteps=timesteps, reset_num_timesteps=False, tb_log_name="PPO_AMR_180425_1")
+    model.learn(total_timesteps=timesteps, reset_num_timesteps=False, tb_log_name="PPO_AMR_190425_0")
     model.save(f"{models_dir}/{timesteps * i}")
     vec_env.save(normalize_path)
 

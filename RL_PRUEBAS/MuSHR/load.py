@@ -10,9 +10,9 @@ np.random.seed(SEED)
 torch.manual_seed(SEED)
 
 # === CONFIGURACIÓN ===
-models_dir = "/media/izan/usb-rl/MuSHR/models_AMR_150425_2/PPO"
+models_dir = "/media/izan/usb-rl/MuSHR/models_AMR_190425_0/PPO"
 model_path = f"{models_dir}/3505000"  # Usa el modelo que quieras
-normalize_path = "/media/izan/usb-rl/MuSHR/models_AMR_150425_2/vec_normalize.pkl"
+normalize_path = "/media/izan/usb-rl/MuSHR/models_AMR_190425_0/vec_normalize.pkl"
 
 # === CREAR Y ENVOLVER ENTORNO ===
 def make_env():
