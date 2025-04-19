@@ -22,30 +22,26 @@ class MuSHREnv(MuJocoPyEnv, utils.EzPickle):
     def __init__(self, **kwargs):
         utils.EzPickle.__init__(self, **kwargs)
         self.last_action = np.zeros(2, dtype=np.float64)  # Inicializa acción previa
-        observation_space = Box(low=-np.inf, high=np.inf, shape=(13,), dtype=np.float64)
+        observation_space = Box(low=-np.inf, high=np.inf, shape=(9,), dtype=np.float64)
         MuJocoPyEnv.__init__(
             self, "one_car.xml", 5, observation_space=observation_space, **kwargs
         )     
 
     def step(self, a):
-        vec = self.get_body_com("buddy") - self.get_body_com("target")
-        distance_to_target = np.linalg.norm(vec)
+        vec_to_target = (self.get_body_com("target") - self.get_body_com("buddy"))[:2] # XY
+        distance_to_target = np.linalg.norm(vec_to_target)
 
         # --- CALCULO DEL HEADING AL OBJETIVO ---
+        #[x, y, z, w, x, y, z] (posición + orientación)
         quat = self.sim.data.qpos[3:7]
-        r = R.from_quat([quat[1], quat[2], quat[3], quat[0]])  # [x, y, z, w] para scipy
-        yaw = r.as_euler("xyz", degrees=True)[2]
+        yaw = R.from_quat([quat[1], quat[2], quat[3], quat[0]]).as_euler("xyz", degrees=True)[2]
 
-        buddy_pos = self.get_body_com("buddy")[:2]
-        target_pos = self.get_body_com("target")[:2]
-        vec_to_target = target_pos - buddy_pos
         target_angle = np.degrees(np.arctan2(vec_to_target[1], vec_to_target[0]))
-
-
+        
         # ===== Normalización y pesos =====
         weight_dist = 1.0
         weight_ctrl = 0.2
-        weight_time = 1
+        weight_time = 0.5
         weight_heading = 1.0
         reward_goal = 100.0
 
@@ -61,8 +57,8 @@ class MuSHREnv(MuJocoPyEnv, utils.EzPickle):
         reward_ctrl = weight_ctrl * -np.square(a).sum()
 
         # --- Recompensa por heading ---
-        heading_error = (target_angle - yaw + 180) % 360 - 180
-        reward_heading = weight_heading * (1- abs(heading_error)/180.0)
+        heading_error = (target_angle - yaw + 180) % 360 - 180 #error angular entre 180 y -180 NORMALIZADO
+        reward_heading = weight_heading * (1 - 2 * abs(heading_error) / 180.0) #Error entre -1 y 1
 
         # === Recompensa final ===
         reward = reward_dist + reward_ctrl + reward_time_penalty + reward_heading
@@ -134,28 +130,24 @@ class MuSHREnv(MuJocoPyEnv, utils.EzPickle):
         return self._get_obs()
 
     def _get_obs(self):
-        # Posición relativa entre el rover y el objetivo (3 xyz)
-        rel_pos = self.get_body_com("buddy") - self.get_body_com("target")  
-        
-        # Distancia al objetivo (1 dist)
-        dist_to_target = [np.linalg.norm(self.get_body_com("buddy") - self.get_body_com("target"))]
-        
-        # Posición absoluta del rover (3 xyz)
-        pos_buddy = self.get_body_com("buddy")  
-        
-        # Orientación del rover (1 angle)
+        # Posición relativa entre el rover y el objetivo (2 -> XY)
+        rel_pos = (self.get_body_com("buddy") - self.get_body_com("target"))[:2]
+
+        # Orientación del rover (YAW)
         orientation_buddy = [np.arctan2(self.get_body_com("buddy")[1], self.get_body_com("buddy")[0])]
         
-        # Posición del objetivo (3 xyz)
-        pos_target = self.get_body_com("target")
-        
+        # Posición absoluta del rover (2 -> XY)
+        pos_buddy = (self.get_body_com("buddy"))[:2]  
+
+        # Posición del objetivo (2 -> XY)
+        pos_target = (self.get_body_com("target"))[:2]
+
         return np.concatenate(
             [
-                rel_pos,           # Vector al objetivo (3)
-                dist_to_target,    # Distancia al objetivo (1)
-                pos_buddy,         # Posición del rover (3)
+                rel_pos,           # Vector al objetivo (2 -> XY)
                 orientation_buddy, # Orientación del rover (1)
-                pos_target,        # Posición del objetivo (3)
+                pos_buddy,         # Posición del rover (2 -> XY)
+                pos_target,        # Posición del objetivo (2 -> XY)
                 self.last_action   # Acción previa (2)
             ]
         )

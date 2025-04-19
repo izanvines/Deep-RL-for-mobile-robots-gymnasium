@@ -4,6 +4,7 @@ import time
 import pygame
 import gymnasium
 from stable_baselines3.common.env_util import make_vec_env
+from stable_baselines3.common.vec_env import VecNormalize
 import torch
 
 # --- SEMILLA ---
@@ -21,7 +22,9 @@ def make_env():
     return gymnasium.make("MuSHREnv-v0", render_mode="human") #-> con entorno gráfico
 
 env = make_vec_env(make_env, n_envs=1, seed=SEED) #Por defeecto usa gymnasium -> ya se ha añadido el entorno a gymnasium para poder usarlo (menos warnings)
-obs = env.reset()
+# Normalizar observaciones y recompensas
+vec_env = VecNormalize(env, norm_obs=True, norm_reward=True, clip_obs=5.0, clip_reward=5.0)
+obs = vec_env.reset()
 
 steering = 0.0
 speed = 0.0
@@ -29,6 +32,8 @@ step_size = 0.05
 
 last_print_time = time.time()
 print_interval = 2.0  # segundos
+
+cumulative_reward = 0.0  # Inicializar antes del bucle while True
 
 print("Controles: ← → para girar | ↑ ↓ para acelerar/frenar | Cierra la ventana para salir")
 
@@ -40,9 +45,9 @@ while True:
     keys = pygame.key.get_pressed()
 
     if keys[pygame.K_LEFT]:
-        steering -= step_size
-    if keys[pygame.K_RIGHT]:
         steering += step_size
+    if keys[pygame.K_RIGHT]:
+        steering -= step_size
     if keys[pygame.K_UP]:
         speed += step_size
     if keys[pygame.K_DOWN]:
@@ -54,30 +59,35 @@ while True:
     action = np.array([[steering, speed]])
     obs, total_reward, terminated, info = env.step(action)
 
+    cumulative_reward += total_reward[0]
+
     # === MOSTRAR ÁNGULO CADA 2 SEGUNDOS ===
     current_time = time.time()
     if current_time - last_print_time > print_interval:
-        qpos = env.envs[0].unwrapped.sim.data.qpos
-        quat = qpos[3:7]  # cuaternión [w, x, y, z]
-        r = R.from_quat([quat[1], quat[2], quat[3], quat[0]])  # scipy usa [x, y, z, w]
-        euler = r.as_euler("xyz", degrees=True)
-        yaw = euler[2]
-
-        # === Ángulo hacia el objetivo ===
-        buddy_pos = env.envs[0].unwrapped.get_body_com("buddy")[:2]
-        target_pos = env.envs[0].unwrapped.get_body_com("target")[:2]
-        vec_to_target = target_pos - buddy_pos
-        target_angle = np.degrees(np.arctan2(vec_to_target[1], vec_to_target[0]))
-
-        print(f"Ángulo del robot (heading/yaw): {yaw:.2f}° | Objetivo en dirección: {target_angle:.2f}°")
+        
         last_print_time = current_time
         
         # Mostrar por terminal cada una de las recompensas
+        print("===================== RECOMPENSA STEP =========================")
+        # Recompensas parciales
+        reward_dist = info[0].get("reward_dist", 0.0)
+        reward_ctrl = info[0].get("reward_ctrl", 0.0)
+        reward_time = info[0].get("reward_time", 0.0)
+        reward_heading = info[0].get("reward_heading", 0.0)
 
+        print(f"Recompensas parciales:")
+        print(f"  Distancia     : {reward_dist:.3f}")
+        print(f"  Control       : {reward_ctrl:.3f}")
+        print(f"  Temporal      : {reward_time:.3f}")
+        print(f"  Heading       : {reward_heading:.3f}")
+        print(f"  Recompensa paso actual: {total_reward[0]:.3f}")
+        print(f"Recompensas acumulada en el epiosdio : {cumulative_reward:.3f}")
+        print("===============================================================")
 
     if terminated:
         print("Episodio terminado")
         obs = env.reset()
+        cumulative_reward = 0.0  # Reiniciar recompensa acumulada
 
     time.sleep(0.05)
 
