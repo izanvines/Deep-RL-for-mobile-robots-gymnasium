@@ -21,8 +21,14 @@ class MuSHREnv(MuJocoPyEnv, utils.EzPickle):
     
     def __init__(self, **kwargs):
         utils.EzPickle.__init__(self, **kwargs)
-        self.last_action = np.zeros(2, dtype=np.float64)  # Inicializa acción previa
-        observation_space = Box(low=-np.inf, high=np.inf, shape=(9,), dtype=np.float64)
+
+        # Inicializión observaciones
+        self.last_action = np.zeros(2, dtype=np.float64)  
+        self.last_yaw = 0.0
+        self.last_heading_error = 0.0
+
+        observation_space = Box(low=-np.inf, high=np.inf, shape=(6,), dtype=np.float64)
+
         MuJocoPyEnv.__init__(
             self, "one_car.xml", 5, observation_space=observation_space, **kwargs
         )     
@@ -34,13 +40,13 @@ class MuSHREnv(MuJocoPyEnv, utils.EzPickle):
         # --- CALCULO DEL HEADING AL OBJETIVO ---
         #[x, y, z, w, x, y, z] (posición + orientación)
         quat = self.sim.data.qpos[3:7]
-        yaw = R.from_quat([quat[1], quat[2], quat[3], quat[0]]).as_euler("xyz", degrees=True)[2]
+        yaw = R.from_quat([quat[1], quat[2], quat[3], quat[0]]).as_euler("xyz", degrees=False)[2]
 
-        target_angle = np.degrees(np.arctan2(vec_to_target[1], vec_to_target[0]))
+        target_angle = np.arctan2(vec_to_target[1], vec_to_target[0])
         
         # ===== Normalización y pesos =====
-        weight_dist = 1.0
-        weight_ctrl = 0.2
+        weight_dist = 3.0
+        weight_ctrl = 100.0
         weight_time = 0.5
         weight_heading = 1.0
         reward_goal = 100.0
@@ -48,17 +54,20 @@ class MuSHREnv(MuJocoPyEnv, utils.EzPickle):
         #--------------------------------- CALCULO DE LA RECOMPENSA --------------------------------- 
         
         # --- Recompensa basada en distancia ---
-        reward_dist = weight_dist * np.exp(-distance_to_target)
+        reward_dist = weight_dist * np.exp(-0.7*distance_to_target)
         
         # --- Penalización por tiempo ---
         reward_time_penalty = -weight_time
 
         # --- Penalización por acción ---
-        reward_ctrl = weight_ctrl * -np.square(a).sum()
+        delta_steering = a[0] - self.last_action[0]
+        reward_ctrl = weight_ctrl * -(delta_steering ** 2)
+        print(reward_ctrl)
 
         # --- Recompensa por heading ---
-        heading_error = (target_angle - yaw + 180) % 360 - 180 #error angular entre 180 y -180 NORMALIZADO
-        reward_heading = weight_heading * (1 - 2 * abs(heading_error) / 180.0) #Error entre -1 y 1
+        heading_error = (target_angle - yaw + np.pi) % (2 * np.pi) - np.pi #error angular entre pi y -pi NORMALIZADO
+        reward_heading = weight_heading * (1 - 2 * abs(heading_error) / np.pi) #Error entre -1 y 1
+        print(reward_heading)
 
         # === Recompensa final ===
         reward = reward_dist + reward_ctrl + reward_time_penalty + reward_heading
@@ -78,9 +87,12 @@ class MuSHREnv(MuJocoPyEnv, utils.EzPickle):
         if self.render_mode == "human":
             self.render()
 
+        self.last_yaw = yaw
+        self.last_heading_error = heading_error
+
         ob = self._get_obs()
 
-        self.last_action = a  # Guarda acción actual como la "última"
+        self.last_action = a 
 
         return (
             ob,
@@ -126,6 +138,8 @@ class MuSHREnv(MuJocoPyEnv, utils.EzPickle):
         self.set_state(qpos, qvel)
 
         self.last_action = np.zeros(2, dtype=np.float64)
+        self.last_yaw = 0.0
+        self.last_heading_error = 0.0
 
         return self._get_obs()
 
@@ -133,22 +147,20 @@ class MuSHREnv(MuJocoPyEnv, utils.EzPickle):
         # Posición relativa entre el rover y el objetivo (2 -> XY)
         rel_pos = (self.get_body_com("buddy") - self.get_body_com("target"))[:2]
 
-        # Orientación del rover (YAW)
-        orientation_buddy = [np.arctan2(self.get_body_com("buddy")[1], self.get_body_com("buddy")[0])]
-        
         # Posición absoluta del rover (2 -> XY)
-        pos_buddy = (self.get_body_com("buddy"))[:2]  
+        #pos_buddy = (self.get_body_com("buddy"))[:2]  
 
         # Posición del objetivo (2 -> XY)
         pos_target = (self.get_body_com("target"))[:2]
 
         return np.concatenate(
             [
-                rel_pos,           # Vector al objetivo (2 -> XY)
-                orientation_buddy, # Orientación del rover (1)
-                pos_buddy,         # Posición del rover (2 -> XY)
-                pos_target,        # Posición del objetivo (2 -> XY)
-                self.last_action   # Acción previa (2)
+                rel_pos,                 # Vector al objetivo - error_pos (2 -> XY)
+                [self.last_heading_error], # Error_orienta (1)
+                #pos_buddy,               # Posición del rover (2 -> XY)
+                [self.last_yaw],           # Orientación del rover (1 -> YAW)
+                #pos_target,              # Posición del objetivo (2 -> XY)
+                self.last_action         # Acción previa (2)
             ]
         )
 
