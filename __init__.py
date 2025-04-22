@@ -373,11 +373,11 @@ register(
 register(
     id="MuSHREnv-v0",
     entry_point="gymnasium.envs.mujoco.mushr:MuSHREnv",
-    max_episode_steps=1000,
+    max_episode_steps=2000,
     #el agente no permanezca indefinidamente en un episodio en caso de no progresar,
     #lo que ayuda a evitar situaciones de bucles infinitos.
 
-    #Si el agente aún no ha alcanzado la meta o un estado terminal en esos 1000 pasos, el episodio finaliza y se reinicia.
+    #Si el agente aún no ha alcanzado la meta o un estado terminal en esos 10000 pasos, el episodio finaliza y se reinicia.
 
 )
 

@@ -1,1 +1,1 @@
-tensorboard --logdir=logs_Reacher_140125
+tensorboard --logdir=~/media/izan/usb-rl/logs_AMR_190425

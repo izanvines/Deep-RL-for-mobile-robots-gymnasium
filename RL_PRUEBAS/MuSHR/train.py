@@ -12,11 +12,11 @@ np.random.seed(SEED)
 torch.manual_seed(SEED)
 
 # === CONFIG ===
-models_dir = "/media/izan/usb-rl/models_AMR_190425_0/PPO"
-logdir = "/media/izan/usb-rl/logs_AMR_190425"
-normalize_path = "/media/izan/usb-rl/models_AMR_190425_0/vec_normalize.pkl"
-timesteps = 5000
-n_iterations = 2000
+models_dir = "/media/izan/usb-rl/models_AMR_220425_1/PPO"
+logdir = "/media/izan/usb-rl/logs_AMR_220425"
+normalize_path = "/media/izan/usb-rl/models_AMR_220425_1/vec_normalize.pkl"
+timesteps = 10000
+n_iterations = 1000
 
 # Crear directorios si no existen
 os.makedirs(models_dir, exist_ok=True)
@@ -48,7 +48,7 @@ model = PPO("MlpPolicy", vec_env, verbose=1, tensorboard_log=logdir)
 
 # === ENTRENAMIENTO ITERATIVO ===
 for i in range(1, n_iterations + 1):
-    model.learn(total_timesteps=timesteps, reset_num_timesteps=False, tb_log_name="PPO_AMR_190425_0")
+    model.learn(total_timesteps=timesteps, reset_num_timesteps=False, tb_log_name="PPO_AMR_220425_1")
     model.save(f"{models_dir}/{timesteps * i}")
     vec_env.save(normalize_path)
 

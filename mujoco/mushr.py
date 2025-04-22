@@ -27,13 +27,19 @@ class MuSHREnv(MuJocoPyEnv, utils.EzPickle):
         self.last_yaw = 0.0
         self.last_heading_error = 0.0
 
-        observation_space = Box(low=-np.inf, high=np.inf, shape=(6,), dtype=np.float64)
+        self.cumulative_reward = 0.0  # Inicializar antes del bucle while True
+
+        observation_space = Box(low=-np.inf, high=np.inf, shape=(10,), dtype=np.float64)
 
         MuJocoPyEnv.__init__(
             self, "one_car.xml", 5, observation_space=observation_space, **kwargs
         )     
 
     def step(self, a):
+
+        terminated = False
+        truncated = False
+
         vec_to_target = (self.get_body_com("target") - self.get_body_com("buddy"))[:2] # XY
         distance_to_target = np.linalg.norm(vec_to_target)
 
@@ -45,16 +51,16 @@ class MuSHREnv(MuJocoPyEnv, utils.EzPickle):
         target_angle = np.arctan2(vec_to_target[1], vec_to_target[0])
         
         # ===== Normalización y pesos =====
-        weight_dist = 3.0
-        weight_ctrl = 100.0
+        weight_dist = 5.0
+        weight_ctrl = 1.0
         weight_time = 0.5
-        weight_heading = 1.0
-        reward_goal = 100.0
+        weight_heading = 2.0
+        reward_goal = 2000.0
 
         #--------------------------------- CALCULO DE LA RECOMPENSA --------------------------------- 
         
         # --- Recompensa basada en distancia ---
-        reward_dist = weight_dist * np.exp(-0.7*distance_to_target)
+        reward_dist = weight_dist * np.exp(-0.3*distance_to_target)
         
         # --- Penalización por tiempo ---
         reward_time_penalty = -weight_time
@@ -62,19 +68,17 @@ class MuSHREnv(MuJocoPyEnv, utils.EzPickle):
         # --- Penalización por acción ---
         delta_steering = a[0] - self.last_action[0]
         reward_ctrl = weight_ctrl * -(delta_steering ** 2)
-        print(reward_ctrl)
 
         # --- Recompensa por heading ---
         heading_error = (target_angle - yaw + np.pi) % (2 * np.pi) - np.pi #error angular entre pi y -pi NORMALIZADO
         reward_heading = weight_heading * (1 - 2 * abs(heading_error) / np.pi) #Error entre -1 y 1
-        print(reward_heading)
 
         # === Recompensa final ===
         reward = reward_dist + reward_ctrl + reward_time_penalty + reward_heading
       
         # --- Recompensa si alcanza el objetivo ---
         min_distance = 0.25
-        terminated = False
+        
         if distance_to_target < min_distance:
             reward += reward_goal
             terminated = True
@@ -94,11 +98,27 @@ class MuSHREnv(MuJocoPyEnv, utils.EzPickle):
 
         self.last_action = a 
 
+        self.cumulative_reward += reward
+
+        
+        """
+        print("===================== RECOMPENSA STEP =========================")
+        print(f"Recompensas parciales:")
+        print(f"  Distancia     : {reward_dist:.3f}")
+        print(f"  Control       : {reward_ctrl:.3f}")
+        print(f"  Temporal      : {reward_time_penalty:.3f}")
+        print(f"  Heading       : {reward_heading:.3f}")
+        print(f"  Recompensa paso actual: {reward:.3f}")
+        print(f"Recompensas acumulada en el epiosdio : {self.cumulative_reward:.3f}")
+        print("===============================================================")
+        """
+        
+
         return (
             ob,
             reward,
             terminated,
-            False,
+            truncated,
             dict(
                 reward_dist=reward_dist,
                 reward_ctrl=reward_ctrl,
@@ -141,6 +161,8 @@ class MuSHREnv(MuJocoPyEnv, utils.EzPickle):
         self.last_yaw = 0.0
         self.last_heading_error = 0.0
 
+        self.cumulative_reward = 0.0  # Reiniciar recompensa acumulada
+
         return self._get_obs()
 
     def _get_obs(self):
@@ -148,7 +170,7 @@ class MuSHREnv(MuJocoPyEnv, utils.EzPickle):
         rel_pos = (self.get_body_com("buddy") - self.get_body_com("target"))[:2]
 
         # Posición absoluta del rover (2 -> XY)
-        #pos_buddy = (self.get_body_com("buddy"))[:2]  
+        pos_buddy = (self.get_body_com("buddy"))[:2]  
 
         # Posición del objetivo (2 -> XY)
         pos_target = (self.get_body_com("target"))[:2]
@@ -157,9 +179,9 @@ class MuSHREnv(MuJocoPyEnv, utils.EzPickle):
             [
                 rel_pos,                 # Vector al objetivo - error_pos (2 -> XY)
                 [self.last_heading_error], # Error_orienta (1)
-                #pos_buddy,               # Posición del rover (2 -> XY)
+                pos_buddy,               # Posición del rover (2 -> XY)
                 [self.last_yaw],           # Orientación del rover (1 -> YAW)
-                #pos_target,              # Posición del objetivo (2 -> XY)
+                pos_target,              # Posición del objetivo (2 -> XY)
                 self.last_action         # Acción previa (2)
             ]
         )
