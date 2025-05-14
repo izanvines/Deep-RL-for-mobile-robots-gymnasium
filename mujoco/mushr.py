@@ -15,19 +15,18 @@ class MuSHREnv(MuJocoPyEnv, utils.EzPickle):
             "rgb_array",
             "depth_array",
         ],
-        "render_fps": 20, #No entiendo porque solo funciona con 20
+        "render_fps": 20,
     }
 
     
     def __init__(self, **kwargs):
         utils.EzPickle.__init__(self, **kwargs)
 
-        # Inicializión observaciones
         self.last_action = np.zeros(2, dtype=np.float64)  
         self.last_yaw = 0.0
         self.last_heading_error = 0.0
 
-        self.cumulative_reward = 0.0  # Inicializar antes del bucle while True
+        self.cumulative_reward = 0.0 
 
         observation_space = Box(low=-np.inf, high=np.inf, shape=(10,), dtype=np.float64)
 
@@ -44,7 +43,6 @@ class MuSHREnv(MuJocoPyEnv, utils.EzPickle):
         distance_to_target = np.linalg.norm(vec_to_target)
 
         # --- CALCULO DEL HEADING AL OBJETIVO ---
-        #[x, y, z, w, x, y, z] (posición + orientación)
         quat = self.sim.data.qpos[3:7]
         yaw = R.from_quat([quat[1], quat[2], quat[3], quat[0]]).as_euler("xyz", degrees=False)[2]
 
@@ -65,7 +63,7 @@ class MuSHREnv(MuJocoPyEnv, utils.EzPickle):
         # --- Penalización por tiempo ---
         reward_time_penalty = -weight_time
 
-        # --- Penalización por acción ---
+        # --- Penalización por diferencia de acciones ---
         delta_steering = a[0] - self.last_action[0]
         reward_ctrl = weight_ctrl * -(delta_steering ** 2)
 
@@ -78,14 +76,12 @@ class MuSHREnv(MuJocoPyEnv, utils.EzPickle):
       
         # --- Recompensa si alcanza el objetivo ---
         min_distance = 0.25
-        
         if distance_to_target < min_distance:
             reward += reward_goal
             terminated = True
        
        
         #---------------------------------------------------------------------------------------------
-        #=== ACCIÓN SOBRE EL ENTORNO ===
         self.do_simulation(a, self.frame_skip) 
 
         if self.render_mode == "human":
@@ -135,24 +131,20 @@ class MuSHREnv(MuJocoPyEnv, utils.EzPickle):
        
         qpos = self.init_qpos
 
-        # Generar una posición aleatoria dentro del rango de distancia especificado
         min_distance = 1.5
         max_distance = 4.0
 
         while True:
-            # Generar una posición aleatoria dentro del cuadrado que engloba el círculo
             random_pos = self.np_random.uniform(low=-max_distance, high=max_distance, size=2)
             distance = np.linalg.norm(random_pos)
             
-            # Aceptar solo posiciones dentro del anillo (entre los radios mínimo y máximo)
-            if min_distance <= distance <= max_distance:
+            if min_distance <= distance <= max_distance: # Ring spawn
                 break
 
         self.goal = random_pos
 
         qpos[-2:] = self.goal
                
-        #Todas las velocidades a 0, partimos del reposo y el objetivo no se mueve
         qvel = self.init_qvel 
 
         self.set_state(qpos, qvel)
@@ -161,18 +153,13 @@ class MuSHREnv(MuJocoPyEnv, utils.EzPickle):
         self.last_yaw = 0.0
         self.last_heading_error = 0.0
 
-        self.cumulative_reward = 0.0  # Reiniciar recompensa acumulada
+        self.cumulative_reward = 0.0 
 
         return self._get_obs()
 
     def _get_obs(self):
-        # Posición relativa entre el rover y el objetivo (2 -> XY)
         rel_pos = (self.get_body_com("buddy") - self.get_body_com("target"))[:2]
-
-        # Posición absoluta del rover (2 -> XY)
         pos_buddy = (self.get_body_com("buddy"))[:2]  
-
-        # Posición del objetivo (2 -> XY)
         pos_target = (self.get_body_com("target"))[:2]
 
         return np.concatenate(

@@ -8,7 +8,7 @@ from stable_baselines3.common.vec_env import VecNormalize
 import torch
 
 # --- SEMILLA ---
-SEED = 42  # o el número que prefieras
+SEED = 42  
 np.random.seed(SEED)
 torch.manual_seed(SEED)
 
@@ -18,12 +18,11 @@ pygame.display.set_caption("Control MuSHR - Teclado")
 
 # === CREAR Y ENVOLVER ENTORNO ===
 def make_env():
-    #return gymnasium.make("MuSHREnv-v0")
-    return gymnasium.make("MuSHREnv-v0", render_mode="human") #-> con entorno gráfico
+    return gymnasium.make("MuSHREnv-v0", render_mode="human") 
 
-env = make_vec_env(make_env, n_envs=1, seed=SEED) #Por defeecto usa gymnasium -> ya se ha añadido el entorno a gymnasium para poder usarlo (menos warnings)
-# Normalizar observaciones y recompensas
-vec_env = VecNormalize(env, norm_obs=True, norm_reward=True, clip_obs=5.0, clip_reward=5.0)
+env = make_vec_env(make_env, n_envs=1, seed=SEED) 
+
+vec_env = VecNormalize(env, norm_obs=True, norm_reward=True, clip_obs=5.0, clip_reward=5.0) # Normalización
 obs = vec_env.reset()
 
 steering = 0.0
@@ -31,9 +30,9 @@ speed = 0.0
 step_size = 0.05
 
 last_print_time = time.time()
-print_interval = 2.0  # segundos
+print_interval = 2.0 
 
-cumulative_reward = 0.0  # Inicializar antes del bucle while True
+cumulative_reward = 0.0
 
 print("Controles: ← → para girar | ↑ ↓ para acelerar/frenar | Cierra la ventana para salir")
 
@@ -67,9 +66,7 @@ while True:
         
         last_print_time = current_time
         
-        # Mostrar por terminal cada una de las recompensas
         print("===================== RECOMPENSA STEP =========================")
-        # Recompensas parciales
         reward_dist = info[0].get("reward_dist", 0.0)
         reward_ctrl = info[0].get("reward_ctrl", 0.0)
         reward_time = info[0].get("reward_time", 0.0)

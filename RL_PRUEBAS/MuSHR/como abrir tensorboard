@@ -1,1 +1,1 @@
-tensorboard --logdir=~/media/izan/usb-rl/logs_AMR_190425
+tensorboard --logdir=/home/izan/Escritorio/logs_AMR

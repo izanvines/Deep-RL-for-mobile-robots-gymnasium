@@ -7,7 +7,7 @@ import numpy as np
 import torch
 
 # --- SEMILLA ---
-SEED = 42  # o el número que prefieras
+SEED = 42  
 np.random.seed(SEED)
 torch.manual_seed(SEED)
 
@@ -18,7 +18,6 @@ normalize_path = "/media/izan/usb-rl/models_AMR_220425_1/vec_normalize.pkl"
 timesteps = 10000
 n_iterations = 1000
 
-# Crear directorios si no existen
 os.makedirs(models_dir, exist_ok=True)
 os.makedirs(logdir, exist_ok=True)
 
